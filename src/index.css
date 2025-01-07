@@ -1,0 +1,39 @@
+@import './styles/fonts.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Clash Grotesk', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply antialiased;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Anton', sans-serif;
+    font-weight: 400;
+  }
+
+  .conversation-title {
+    font-family: 'Clash Grotesk', sans-serif;
+    font-weight: 700;
+  }
+} 
+
+@layer utilities {
+  .animate-fade-out {
+    animation: fadeOut 2s ease-in-out;
+  }
+}
+
+@keyframes fadeOut {
+  0% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+} 
