@@ -1,71 +1,84 @@
 import { Message, Transcript } from '../types/types';
+import { dbService } from './dbService';
 
-interface ChatSession {
-  id: string;
-  title: string;
-  date: Date;
-  preview: string;
-  messages: Message[];
-  transcript: Transcript;
-  isFavorite: boolean;
-}
-
-const STORAGE_KEY = 'chat_history';
-
-export const saveChatToHistory = (messages: Message[], transcript: Transcript, isFavorite: boolean = false) => {
-  const chatHistory = getChatHistory();
-  const existingChatIndex = chatHistory.findIndex(chat => chat.id === transcript.id);
-  
-  const chatSession: ChatSession = {
-    id: transcript.id,
-    title: transcript.title,
-    date: transcript.uploadDate,
-    preview: messages[messages.length - 1]?.content || '',
-    messages,
-    transcript,
-    isFavorite
-  };
-
-  if (existingChatIndex !== -1) {
-    // Only update favorite status if it's explicitly provided
-    if (isFavorite !== undefined) {
-      chatSession.isFavorite = isFavorite;
-    } else {
-      chatSession.isFavorite = chatHistory[existingChatIndex].isFavorite;
-    }
-    chatHistory[existingChatIndex] = chatSession;
-  } else {
-    chatHistory.unshift(chatSession);
+export const saveChatToHistory = async (
+  messages: Message[], 
+  transcript: Transcript, 
+  isFavorite: boolean = false,
+  userId: number = 1 // Default user ID until auth is implemented
+) => {
+  try {
+    const title = transcript.title || 'Nouvelle conversation';
+    await dbService.saveConversation(userId, title, messages, transcript, isFavorite);
+  } catch (error) {
+    console.error('Error saving chat to history:', error);
+    throw error;
   }
-
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(chatHistory));
 };
 
-export const getChatHistory = (): ChatSession[] => {
-  const history = localStorage.getItem(STORAGE_KEY);
-  if (!history) return [];
-  
-  return JSON.parse(history).map((chat: any) => ({
-    ...chat,
-    date: new Date(chat.date),
-    messages: chat.messages.map((msg: any) => ({
-      ...msg,
-      timestamp: new Date(msg.timestamp)
-    })),
-    transcript: {
-      ...chat.transcript,
-      uploadDate: new Date(chat.transcript.uploadDate)
-    }
-  }));
+export const getChatHistory = async (userId: number = 1) => {
+  try {
+    const conversations = await dbService.getConversations(userId);
+    return conversations.map(conv => ({
+      id: conv.id.toString(),
+      title: conv.title,
+      date: new Date(conv.created_at),
+      preview: conv.message_count > 0 ? `${conv.message_count} messages` : 'No messages',
+      isFavorite: conv.is_favorite
+    }));
+  } catch (error) {
+    console.error('Error getting chat history:', error);
+    return [];
+  }
 };
 
-export const loadChatSession = (id: string): ChatSession | null => {
-  const history = getChatHistory();
-  return history.find(chat => chat.id === id) || null;
+export const loadChatSession = async (chatId: string) => {
+  try {
+    const conversation = await dbService.getConversation(parseInt(chatId));
+    if (!conversation) return null;
+
+    return {
+      messages: conversation.messages.map(msg => ({
+        ...msg,
+        id: msg.id.toString(),
+        timestamp: new Date(msg.timestamp)
+      })),
+      transcript: {
+        ...conversation.transcript,
+        uploadDate: new Date(conversation.transcript.upload_date)
+      },
+      title: conversation.title,
+      isFavorite: conversation.is_favorite
+    };
+  } catch (error) {
+    console.error('Error loading chat session:', error);
+    return null;
+  }
 };
 
-export const deleteChatSession = (id: string): void => {
-  const history = getChatHistory();
-  const updatedHistory = history.filter(chat => chat.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedHistory));
+export const updateChatTitle = async (chatId: string, title: string) => {
+  try {
+    await dbService.updateConversationTitle(parseInt(chatId), title);
+  } catch (error) {
+    console.error('Error updating chat title:', error);
+    throw error;
+  }
+};
+
+export const toggleChatFavorite = async (chatId: string) => {
+  try {
+    await dbService.toggleFavorite(parseInt(chatId));
+  } catch (error) {
+    console.error('Error toggling favorite status:', error);
+    throw error;
+  }
+};
+
+export const deleteChatSession = async (chatId: string) => {
+  try {
+    await dbService.deleteConversation(parseInt(chatId));
+  } catch (error) {
+    console.error('Error deleting chat session:', error);
+    throw error;
+  }
 }; 
